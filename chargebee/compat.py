@@ -61,9 +61,18 @@ class VerifiedHTTPSConnection(HTTPSConnection):
         # Add certificate verification
         sock = socket.create_connection((self.host, self.port), self.timeout)
 
+        # ssl.wrap_socket() was removed in Python 3.12; use SSLContext instead.
+        # check_hostname is disabled because match_hostname() below already
+        # performs that check, matching the pre-3.12 wrap_socket() behavior.
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = self.cert_reqs
+        if self.ca_certs:
+            context.load_verify_locations(self.ca_certs)
+
         # Wrap socket using verification with the root certs in
         # trusted_root_certs
-        self.sock = ssl.wrap_socket(sock, cert_reqs=self.cert_reqs, ca_certs=self.ca_certs)
+        self.sock = context.wrap_socket(sock, server_hostname=self.host)
 
         if self.ca_certs:
             match_hostname(self.sock.getpeercert(), self.host)
